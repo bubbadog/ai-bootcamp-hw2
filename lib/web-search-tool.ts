@@ -21,29 +21,54 @@ export const LuminAIriesTool = tool({
   }),
   async execute({ query, maxResults = 5 }) {
     const apiKey = process.env.SERPAPI_API_KEY;
-    // Helper function to filter out Simon/Sam Willison results
-    function isWillisonResult(item: any) {
-      const lowerUrl = (item.url || '').toLowerCase();
-      const lowerAuthor = (item.author || '').toLowerCase();
-      const lowerTitle = (item.title || '').toLowerCase();
-      const lowerSnippet = (item.snippet || '').toLowerCase();
-      return (
-        lowerUrl.includes('simonwillison.net') ||
-        lowerAuthor.includes('simon willison') ||
-        lowerAuthor.includes('sam willison') ||
-        lowerTitle.includes('simon willison') ||
-        lowerTitle.includes('sam willison') ||
-        lowerSnippet.includes('simon willison') ||
-        lowerSnippet.includes('sam willison')
-      );
+    console.log("[WebSearch] API Key present:", !!apiKey);
+    console.log("[WebSearch] Query:", query, "MaxResults:", maxResults);
+    
+    // Helper function to filter Simon/Sam Willison results (allow max 1)
+    function filterWillisonResults(items: any[]) {
+      let simonCount = 0;
+      return items.filter((item) => {
+        const lowerUrl = (item.url || '').toLowerCase();
+        const lowerAuthor = (item.author || '').toLowerCase();
+        const lowerTitle = (item.title || '').toLowerCase();
+        const lowerSnippet = (item.snippet || '').toLowerCase();
+        
+        const isWillison = (
+          lowerUrl.includes('simonwillison.net') ||
+          lowerAuthor.includes('simon willison') ||
+          lowerAuthor.includes('sam willison') ||
+          lowerTitle.includes('simon willison') ||
+          lowerTitle.includes('sam willison') ||
+          lowerSnippet.includes('simon willison') ||
+          lowerSnippet.includes('sam willison')
+        );
+        
+        if (isWillison) {
+          if (simonCount < 1) {
+            simonCount++;
+            return true;
+          }
+          return false;
+        }
+        return true;
+      });
     }
 
     if (apiKey) {
       try {
-        const serpResults = await serpApiSearch(query, apiKey);
-        // Filter: exclude all results from Simon/Sam Willison
-        const filtered = serpResults.filter((item) => !isWillisonResult(item));
-        return filtered.slice(0, maxResults).map((item, i) => ({
+        console.log("[WebSearch] Using single search query:", query);
+        
+        // Use a single, well-crafted search query
+        const searchQuery = `${query} AI blog -site:simonwillison.net`;
+        const serpResults = await serpApiSearch(searchQuery, apiKey);
+        
+        console.log("[WebSearch] SerpApi results count:", serpResults.length);
+        
+        // Filter and deduplicate
+        const filtered = filterWillisonResults(serpResults);
+        const uniqueResults = Array.from(new Map(filtered.map(item => [item.url, item])).values());
+        
+        const finalResults = uniqueResults.slice(0, maxResults).map((item, i) => ({
           id: `serpapi-${Date.now()}-${i}`,
           title: item.title,
           url: item.url,
@@ -51,16 +76,22 @@ export const LuminAIriesTool = tool({
           publishedDate: item.date_published || undefined,
           source: "web-search"
         }));
+        
+        console.log("[WebSearch] Final SerpApi results:", finalResults.length);
+        return finalResults;
       } catch (error) {
         console.error("SerpApi error:", error);
         // fallback to simulated
       }
     }
+    
+    console.log("[WebSearch] Using simulated results (no API key or error)");
     // fallback to simulated results if no API key or error
     const searchService = new WebSearchService();
-    let results = await searchService.searchWeb(query);
-    // Filter: exclude all results from Simon/Sam Willison
-    results = results.filter((item) => !isWillisonResult(item));
+    let results = await searchService.searchWeb(query, maxResults * 2); // Get more results to compensate for filtering
+    // Filter: allow at most one result from Simon/Sam Willison
+    results = filterWillisonResults(results);
+    console.log("[WebSearch] Simulated results after filtering:", results.length);
     return results.slice(0, maxResults);
   }
 });
@@ -112,11 +143,11 @@ class WebSearchService {
     "together.ai/blog"
   ];
 
-  async searchWeb(query: string): Promise<WebSearchResult[]> {
+  async searchWeb(query: string, maxResults: number = 5): Promise<WebSearchResult[]> {
     try {
       const searchQueries = await this.generateSearchQueries(query);
-      const results = await this.simulateWebSearch(searchQueries, query);
-      return results;
+      const results = await this.simulateWebSearch(searchQueries, query, maxResults);
+      return results.slice(0, maxResults);
     } catch (error) {
       console.error("Web search error:", error);
       return [];
@@ -158,7 +189,7 @@ Format each query as a separate line. Make queries specific and relevant to the 
     }
   }
 
-  private async simulateWebSearch(searchQueries: string[], originalQuery: string): Promise<WebSearchResult[]> {
+  private async simulateWebSearch(searchQueries: string[], originalQuery: string, maxResults: number = 5): Promise<WebSearchResult[]> {
     const simulatedResults: WebSearchResult[] = [];
     
     const aiTopics = [
@@ -184,7 +215,9 @@ Format each query as a separate line. Make queries specific and relevant to the 
       "AI infrastructure"
     ];
 
-    for (let i = 0; i < 5; i++) {
+    // Generate more results to account for filtering
+    const numToGenerate = Math.max(maxResults * 2, 10);
+    for (let i = 0; i < numToGenerate; i++) {
       const topic = aiTopics[Math.floor(Math.random() * aiTopics.length)];
       const luminary = this.aiLuminaries[Math.floor(Math.random() * this.aiLuminaries.length)];
       const blog = this.aiBlogs[Math.floor(Math.random() * this.aiBlogs.length)];

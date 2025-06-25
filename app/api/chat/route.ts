@@ -17,46 +17,6 @@ export async function POST(req: Request) {
     let webSearchResults: WebSearchSource[] = [];
     let ragTopics: string[] = [];
 
-    // Always perform a web search in parallel using RAG topics
-    const webSearchPromise = (async () => {
-      try {
-        // If we have RAG topics, search for each and aggregate results
-        let allResults: WebSearchSource[] = [];
-        if (ragTopics.length > 0) {
-          for (const topic of ragTopics) {
-            const results = await LuminAIriesTool.execute({ query: topic, maxResults: 15 }, { toolCallId: 'manual', messages: [] });
-            allResults = allResults.concat(results.map((result) => ({
-              id: result.id,
-              title: result.title,
-              url: result.url,
-              snippet: result.snippet,
-              author: (result as any).author,
-              publishedDate: result.publishedDate,
-              source: "web-search" as const
-            })));
-          }
-          // Deduplicate by URL
-          const uniqueResults = Array.from(new Map(allResults.map(item => [item.url, item])).values());
-          // Limit to 5 results total
-          return uniqueResults.slice(0, 5);
-        } else {
-          // fallback: use user message as query
-          const webSearchToolResult = await LuminAIriesTool.execute({ query: userMessage?.content || '', maxResults: 5 }, { toolCallId: 'manual', messages: [] });
-          return webSearchToolResult.map((result) => ({
-            id: result.id,
-            title: result.title,
-            url: result.url,
-            snippet: result.snippet,
-            author: (result as any).author,
-            publishedDate: result.publishedDate,
-            source: "web-search" as const
-          }));
-        }
-      } catch (e) {
-        return [];
-      }
-    })();
-
     if (userMessage?.role === "user" && userMessage?.content) {
       try {
         // Get vectorized documents
@@ -69,14 +29,82 @@ export async function POST(req: Request) {
           vectorizeService.formatDocumentsForContext(documents);
         console.log("[RAG] Formatted context:", contextDocuments);
         sources = vectorizeService.convertDocumentsToChatSources(documents);
-        // Extract topics from the top 3 RAG documents (use their text fields)
-        ragTopics = documents.slice(0, 3).map(doc => doc.text.split(". ")[0]);
+        // Extract meaningful topics from the RAG documents using AI
+        if (documents.length > 0) {
+          const documentTexts = documents.slice(0, 3).map(doc => doc.text.substring(0, 500)).join('\n\n---\n\n');
+          try {
+            const topicExtractionResult = await generateText({
+              model: openai("gpt-4o-mini"),
+              prompt: `Extract 3-5 specific, searchable topics or key concepts from these document excerpts that would be good for finding related blog posts and articles:
+
+${documentTexts}
+
+Return only the topics, one per line, as clear search queries (e.g., "large language models", "retrieval augmented generation", "vector embeddings").`,
+              maxTokens: 200,
+            });
+            
+            ragTopics = topicExtractionResult.text
+              .split('\n')
+              .map(line => line.trim().replace(/^[-*•]\s*/, ''))
+              .filter(line => line.length > 0)
+              .slice(0, 4);
+            
+            console.log("[RAG] Extracted topics for web search:", ragTopics);
+          } catch (topicError) {
+            console.error("Topic extraction failed:", topicError);
+            // Fallback: use user query
+            ragTopics = [userMessage.content];
+          }
+        }
       } catch (vectorizeError) {
         console.error("Vectorize retrieval failed:", vectorizeError);
         contextDocuments =
           "Unable to retrieve relevant documents at this time.";
         sources = [];
       }
+    }
+
+    // Now perform web search using the extracted RAG topics
+    try {
+      let allResults: WebSearchSource[] = [];
+      if (ragTopics.length > 0) {
+        console.log("[WebSearch] Using RAG topics:", ragTopics);
+        // Combine all topics into a single search query
+        const combinedQuery = ragTopics.join(" OR ");
+        console.log("[WebSearch] Combined search query:", combinedQuery);
+        
+        const results = await LuminAIriesTool.execute({ query: combinedQuery, maxResults: 20 }, { toolCallId: 'manual', messages: [] });
+        allResults = results.map((result) => ({
+          id: result.id,
+          title: result.title,
+          url: result.url,
+          snippet: result.snippet,
+          author: (result as any).author,
+          publishedDate: result.publishedDate,
+          source: "web-search" as const
+        }));
+        
+        // Deduplicate by URL
+        const uniqueResults = Array.from(new Map(allResults.map(item => [item.url, item])).values());
+        // Limit to 5 results total
+        webSources = uniqueResults.slice(0, 5);
+      } else {
+        // fallback: use user message as query
+        console.log("[WebSearch] Using user message as fallback:", userMessage?.content);
+        const webSearchToolResult = await LuminAIriesTool.execute({ query: userMessage?.content || '', maxResults: 5 }, { toolCallId: 'manual', messages: [] });
+        webSources = webSearchToolResult.map((result) => ({
+          id: result.id,
+          title: result.title,
+          url: result.url,
+          snippet: result.snippet,
+          author: (result as any).author,
+          publishedDate: result.publishedDate,
+          source: "web-search" as const
+        }));
+      }
+    } catch (webSearchError) {
+      console.error("Web search failed:", webSearchError);
+      webSources = [];
     }
 
     const systemPrompt = `You are a helpful AI assistant that specializes in answering questions based on sources.
@@ -134,9 +162,6 @@ Keep your answer to less than 20 sentences.`;
         }
       }
     }
-
-    // Always use the parallel web search results at the bottom
-    webSources = await webSearchPromise;
 
     // Return both the text response and sources
     return Response.json({
