@@ -5,6 +5,19 @@ export interface ChatSource {
   snippet: string;
   relevancy?: number;
   similarity?: number;
+  source?: "vector" | "web-search";
+  author?: string;
+  publishedDate?: string;
+}
+
+export interface WebSearchSource {
+  id: string;
+  title: string;
+  url: string;
+  snippet: string;
+  author?: string;
+  publishedDate?: string;
+  source: "web-search";
 }
 
 export interface ChatMessageWithSources {
@@ -12,5 +25,6 @@ export interface ChatMessageWithSources {
   role: "user" | "assistant";
   content: string;
   sources?: ChatSource[];
+  webSources?: WebSearchSource[];
   createdAt: string | Date;
 }

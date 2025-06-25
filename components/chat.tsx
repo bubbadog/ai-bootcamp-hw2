@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import type { ChatSource } from "@/types/chat";
+import type { ChatSource, WebSearchSource } from "@/types/chat";
 import SourcesDisplay from "./sources-display";
+import WebSourcesDisplay from "./web-sources-display";
 import { loadingMessages } from "@/lib/consts";
 
 interface Message {
@@ -14,6 +15,7 @@ interface Message {
 
 interface MessageWithSources extends Message {
   sources?: ChatSource[];
+  webSources?: WebSearchSource[];
 }
 
 export default function Chat() {
@@ -23,6 +25,7 @@ export default function Chat() {
   const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const autoSendRef = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -70,14 +73,13 @@ export default function Chat() {
     };
   }, [isLoading]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  const sendMessage = async (messageText: string) => {
+    if (!messageText.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: messageText.trim(),
       createdAt: new Date(),
     };
 
@@ -107,6 +109,7 @@ export default function Chat() {
         role: "assistant",
         content: data.content,
         sources: data.sources || [],
+        webSources: data.webSources || [],
         createdAt: new Date(),
       };
 
@@ -125,10 +128,28 @@ export default function Chat() {
     }
   };
 
+  useEffect(() => {
+    if (autoSendRef.current && input) {
+      autoSendRef.current = false;
+      sendMessage(input);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input]);
+
+  const handleInitialPrompt = () => {
+    autoSendRef.current = true;
+    setInput("Summarize Simon's blog posts on AI or LLMs");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await sendMessage(input);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background">
       <header className="border-b border-border p-4">
-        <h1 className="text-xl font-semibold text-foreground">Chat</h1>
+        <h1 className="text-xl font-semibold text-foreground">LuminAIries Chat</h1>
       </header>
 
       <div
@@ -141,6 +162,13 @@ export default function Chat() {
             <p className="text-xs mt-2">
               Ask about vectorization, embeddings, or RAG systems!
             </p>
+            <button
+              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity"
+              onClick={handleInitialPrompt}
+              type="button"
+            >
+              Summarize Simon's blog posts on AI or LLMs
+            </button>
           </div>
         ) : (
           messages.map((message) => (
@@ -177,6 +205,13 @@ export default function Chat() {
                       })}
                     </span>
                   </div>
+
+                  {/* Web sources at the bottom for assistant messages */}
+                  {message.role === "assistant" &&
+                    message.webSources &&
+                    message.webSources.length > 0 && (
+                      <WebSourcesDisplay webSources={message.webSources} />
+                    )}
                 </div>
               </div>
             </div>

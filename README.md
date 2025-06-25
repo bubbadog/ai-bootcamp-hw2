@@ -1,14 +1,89 @@
-# RAG Next.js TypeScript Application
+[![GitHub - bubbadog/ai-bootcamp-hw2](https://img.shields.io/badge/GitHub-ai--bootcamp--hw2-blue?logo=github)](https://github.com/bubbadog/ai-bootcamp-hw2)
 
-A modern **Retrieval-Augmented Generation (RAG)** chat application built with Next.js, TypeScript, and powered by OpenAI's GPT models with vector-based document retrieval using Vectorize.io.
+# AI Bootcamp Homework 2 - RAG with Web Search
 
-## 🚀 Features
+This project implements a Retrieval Augmented Generation (RAG) system with web search capabilities for finding AI luminary blogs and articles.
 
-- **AI-Powered Chat**: Interactive chat interface with GPT-4o-mini
-- **Document Retrieval**: RAG system that retrieves relevant context from vectorized documents
-- **Real-time Sources**: View document sources that inform AI responses
-- **Modern UI**: Clean, responsive interface built with Tailwind CSS
-- **Type Safety**: Full TypeScript implementation
+## Features
+
+### Core RAG Functionality
+- **Vector Search**: Uses Vectorize.io for document retrieval and similarity search
+- **Context-Aware Responses**: AI responses are based on retrieved documents
+- **Source Attribution**: Shows relevant sources for each response
+
+### Web Search Tool Calling
+- **Dynamic Web Search**: LLM can call a web search tool to find articles from AI luminaries
+- **AI Luminary Focus**: Searches blogs and articles from leading AI researchers and practitioners
+- **Tool Integration**: Uses function calling to let the LLM decide when to search for additional information
+
+## How It Works
+
+### Tool Calling Process
+1. User asks a question
+2. System retrieves relevant documents from vector database
+3. LLM analyzes the question and available context
+4. **If needed**, LLM calls the web search tool to find additional articles from AI luminaries
+5. LLM incorporates both vector search results and web search results into the response
+6. Response includes links to both local documents and web articles
+
+### Web Search Tool
+The `search_web_for_ai_luminaries` tool:
+- Searches for articles from AI luminaries like Andrew Ng, Yann LeCun, Geoffrey Hinton, etc.
+- Focuses on authoritative AI blogs and research sites
+- Returns structured results with titles, URLs, snippets, and author information
+- Can be called dynamically by the LLM when additional context is needed
+
+## Technology Stack
+
+- **Frontend**: Next.js 15, React 19, TypeScript
+- **AI**: OpenAI GPT-4o-mini via AI SDK
+- **Vector Database**: Vectorize.io
+- **Styling**: Tailwind CSS
+- **Tool Calling**: AI SDK function calling
+
+## Getting Started
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Set up environment variables:
+   ```bash
+   VECTORIZE_API_KEY=your_vectorize_api_key
+   OPENAI_API_KEY=your_openai_api_key
+   ```
+
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+## Usage
+
+1. **Ask Questions**: Type questions about AI topics, vectorization, embeddings, or RAG systems
+2. **Automatic Web Search**: The LLM will automatically search for relevant AI luminary articles when needed
+3. **Explore Sources**: Click on source links to view the original documents and articles
+4. **Web Articles**: View related articles from AI luminaries at the bottom of responses
+
+## Architecture
+
+```
+User Query → Vector Search → LLM Analysis → Tool Calling (if needed) → Response with Sources
+                                    ↓
+                            Web Search Tool
+                                    ↓
+                            AI Luminary Articles
+```
+
+## Future Enhancements
+
+- Integration with real search APIs (Google Custom Search, Bing Web Search)
+- Caching of web search results
+- More sophisticated query generation
+- Additional tools for different types of searches
 
 ## 🛠️ Tech Stack
 
@@ -49,7 +124,7 @@ Before setting up this project, you'll need:
 
    ```env
    # OpenAI Configuration
-   OPENAI_API_KEY=your_openai_api_key_here
+   OPENAI_API_KEY=your_openai_api_key
 
    # Vectorize.io Configuration
    VECTORIZE_PIPELINE_ACCESS_TOKEN=your_vectorize_access_token_here
@@ -68,7 +143,7 @@ Before setting up this project, you'll need:
 3. Click "Create new secret key"
 4. Give your key a name (e.g., "rag-next-app")
 5. Copy the generated key immediately (you won't see it again!)
-6. In your `.env.local` file, replace `your_openai_api_key_here` with your actual key:
+6. In your `.env.local` file, replace `your_openai_api_key` with your actual key:
    ```env
    OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxx
    ```
@@ -229,3 +304,19 @@ To add documents to your vector database, you'll need to use the Vectorize.io pl
 3. Make your changes
 4. Run tests and linting
 5. Submit a pull request
+
+## 🗂️ Repository Setup
+
+To initialize this repository and push your first commit, run:
+
+```bash
+echo "# ai-bootcamp-hw2" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/bubbadog/ai-bootcamp-hw2.git
+git push -u origin main
+```
+
+View the repository on GitHub: [bubbadog/ai-bootcamp-hw2](https://github.com/bubbadog/ai-bootcamp-hw2)
