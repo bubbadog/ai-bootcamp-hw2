@@ -21,21 +21,28 @@ export const LuminAIriesTool = tool({
   }),
   async execute({ query, maxResults = 5 }) {
     const apiKey = process.env.SERPAPI_API_KEY;
+    // Helper function to filter out Simon/Sam Willison results
+    function isWillisonResult(item: any) {
+      const lowerUrl = (item.url || '').toLowerCase();
+      const lowerAuthor = (item.author || '').toLowerCase();
+      const lowerTitle = (item.title || '').toLowerCase();
+      const lowerSnippet = (item.snippet || '').toLowerCase();
+      return (
+        lowerUrl.includes('simonwillison.net') ||
+        lowerAuthor.includes('simon willison') ||
+        lowerAuthor.includes('sam willison') ||
+        lowerTitle.includes('simon willison') ||
+        lowerTitle.includes('sam willison') ||
+        lowerSnippet.includes('simon willison') ||
+        lowerSnippet.includes('sam willison')
+      );
+    }
+
     if (apiKey) {
       try {
         const serpResults = await serpApiSearch(query, apiKey);
-        // Filter: at most one result from simonwillison.net
-        let simonFound = false;
-        const filtered = serpResults.filter((item) => {
-          if (item.url.includes('simonwillison.net')) {
-            if (!simonFound) {
-              simonFound = true;
-              return true;
-            }
-            return false;
-          }
-          return true;
-        });
+        // Filter: exclude all results from Simon/Sam Willison
+        const filtered = serpResults.filter((item) => !isWillisonResult(item));
         return filtered.slice(0, maxResults).map((item, i) => ({
           id: `serpapi-${Date.now()}-${i}`,
           title: item.title,
@@ -51,7 +58,9 @@ export const LuminAIriesTool = tool({
     }
     // fallback to simulated results if no API key or error
     const searchService = new WebSearchService();
-    const results = await searchService.searchWeb(query);
+    let results = await searchService.searchWeb(query);
+    // Filter: exclude all results from Simon/Sam Willison
+    results = results.filter((item) => !isWillisonResult(item));
     return results.slice(0, maxResults);
   }
 });

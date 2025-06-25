@@ -24,7 +24,7 @@ export async function POST(req: Request) {
         let allResults: WebSearchSource[] = [];
         if (ragTopics.length > 0) {
           for (const topic of ragTopics) {
-            const results = await LuminAIriesTool.execute({ query: topic, maxResults: 3 }, { toolCallId: 'manual', messages: [] });
+            const results = await LuminAIriesTool.execute({ query: topic, maxResults: 15 }, { toolCallId: 'manual', messages: [] });
             allResults = allResults.concat(results.map((result) => ({
               id: result.id,
               title: result.title,
@@ -35,20 +35,10 @@ export async function POST(req: Request) {
               source: "web-search" as const
             })));
           }
-          // Filter: at most one result from simonwillison.net
-          let simonFound = false;
-          allResults = allResults.filter((item) => {
-            if (item.url.includes('simonwillison.net')) {
-              if (!simonFound) {
-                simonFound = true;
-                return true;
-              }
-              return false;
-            }
-            return true;
-          });
+          // Deduplicate by URL
+          const uniqueResults = Array.from(new Map(allResults.map(item => [item.url, item])).values());
           // Limit to 5 results total
-          return allResults.slice(0, 5);
+          return uniqueResults.slice(0, 5);
         } else {
           // fallback: use user message as query
           const webSearchToolResult = await LuminAIriesTool.execute({ query: userMessage?.content || '', maxResults: 5 }, { toolCallId: 'manual', messages: [] });
